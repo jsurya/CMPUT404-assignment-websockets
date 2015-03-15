@@ -49,3 +49,15 @@ INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
 CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
+
+CMPUT 410 Winter 2015 Assignment Submission
+===========================================
+
+### Contributors:
+
+* Jessica Surya
+* Paul Nhan
+
+### Resources
+- [Web Sockets example code](https://github.com/abramhindle/WebSocketsExamples) by Abram Hindle
+
