@@ -13,8 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+# CMPUT 410 Winter 2015 Assignment Submission
+# Due: March 18. 2015
+# Original assignment creator: Abram Hindle
+# Assignment Contributors: Paul Nhan (pnhan), Jessica Surya (jsurya)
+#
+# References: Web Socket example code 
+#   https://github.com/abramhindle/WebSocketsExamples
+#
+
 import flask
-from flask import Flask, request
+from flask import Flask, request, make_response
 from flask_sockets import Sockets
 import gevent
 from gevent import queue
@@ -48,7 +57,10 @@ class World:
     def update_listeners(self, entity):
         '''update the set listeners'''
         for listener in self.listeners:
-            listener(entity, self.get(entity))
+            try:
+                listener(entity, self.get(entity))
+            except:
+                self.listeners.remove(listener)
 
     def clear(self):
         self.space = dict()
@@ -61,10 +73,11 @@ class World:
 
 myWorld = World()        
 
-def set_listener( entity, data ):
+def set_listener( ws, entity, data ):
     ''' do something with the update ! '''
-
-myWorld.add_set_listener( set_listener )
+    ent = {};
+    ent[entity] = data
+    ws.send(JSON.dumps(ent))
         
 @app.route('/')
 def hello():
@@ -74,14 +87,16 @@ def hello():
 
 def read_ws(ws,client):
     '''A greenlet function that reads from the websocket and updates the world'''
-    # XXX: TODO IMPLEMENT ME
     try:
         while True:
             msg = ws.receive()
             print "WS RECV: %s" % msg
             if (msg is not None):
                 packet = json.loads(msg)
-                send_all_json( packet )
+                for ent in packet:
+                    for key in packet[entity]:
+                        myWorld.update(ent, key, packet[entity][key])
+                    myWorld.update_listeners(ent)
             else:
                 break
     except:
@@ -91,22 +106,18 @@ def read_ws(ws,client):
 def subscribe_socket(ws):
     '''Fufill the websocket URL of /subscribe, every update notify the
        websocket and read updates from the websocket '''
-    client = Client()
-    clients.append(client)
-    g = gevent.spawn( read_ws, ws, client )    
+   
+    myWorld.add_set_listener(ws)
+    ws.send(json.dumps(myWorld.world()))
     print "Subscribing"
     try:
         while True:
             # block here
-            msg = client.get()
-            print "Got a message!"
-            ws.send(msg)
+            read_ws(ws, None)
     except Exception as e:# WebSocketError as e:
         print "WS Error %s" % e
-    finally:
-        clients.remove(client)
-        gevent.kill(g)
-
+        ws.close()
+    return None
 
 def flask_post_json():
     '''Ah the joys of frameworks! They do so much work for you
@@ -123,21 +134,21 @@ def update(entity):
     '''update the entities via this interface'''
     # Get the json 
     obj = flask_post_json()
+    
     # call myWorld.update on the entity, key, value
-    for key, value in obj.items():
-        print "entity = " + entity + ": key = " + str(key) + " , value = " + str(value)
-        if myWorld.get(entity) == None:
-            myWorld.set(entity, obj)
-        else:
-            myWorld.update(entity,key,value)
+    for key in obj:
+        print "key = " + str(key)
+        myWorld.update(entity, key, obj[key])
 
     # Return the updated entity
-    return get_entity(entity)
+    return obj
 
 @app.route("/world", methods=['POST','GET'])    
 def world():
     '''you should probably return the world here'''
-    return json.dumps(myWorld.world())
+    resp = make_response(json.dumps(myWorld.world()))
+    resp.headers['Content-Type'] = "application/json"
+    return resp
 
 @app.route("/entity/<entity>")    
 def get_entity(entity):
@@ -147,7 +158,8 @@ def get_entity(entity):
 @app.route("/clear", methods=['POST','GET'])
 def clear():
     '''Clear the world out!'''
-    return myWorld.clear()
+    myWorld.clear()
+    return world()
 
 
 
