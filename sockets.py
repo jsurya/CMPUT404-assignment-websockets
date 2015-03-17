@@ -48,7 +48,7 @@ class World:
         entry = self.space.get(entity,dict())
         entry[key] = value
         self.space[entity] = entry
-        self.update_listeners( entity )
+        # update_listeners( entity )
 
     def set(self, entity, data):
         self.space[entity] = data
@@ -103,14 +103,15 @@ def subscribe_socket(ws):
     myWorld.add_set_listener(ws)
     ws.send(json.dumps(myWorld.world()))
     print "Subscribing"
-    try:
-        while True:
+    while True:
             # block here
+        try:
             read_ws(ws, None)
-    except Exception as e:# WebSocketError as e:
-        print "WS Error %s" % e
-        ws.close()
-    return None
+        except Exception as e:# WebSocketError as e:
+            print "WS Error %s" % e
+            ws.close()
+            break
+    ws.send(json.dumps(myWorld.world()))
 
 def flask_post_json():
     '''Ah the joys of frameworks! They do so much work for you
@@ -152,7 +153,7 @@ def get_entity(entity):
 def clear():
     '''Clear the world out!'''
     myWorld.clear()
-    return world()
+    return None
 
 
 
