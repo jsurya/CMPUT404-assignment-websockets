@@ -35,6 +35,22 @@ app = Flask(__name__)
 sockets = Sockets(app)
 app.debug = True
 
+clients = list()
+def send_all(msg):
+    for client in clients:
+        client.put( msg )
+
+def send_all_json(obj):
+    send_all( json.dumps(obj) )
+
+class Client:
+    def __init__(self):
+        self.queue = queue.Queue()
+    def put(self, v):
+        self.queue.put_nowait(v)
+    def get(self):
+        return self.queue.get()
+
 class World:
     def __init__(self):
         self.clear()
@@ -73,11 +89,11 @@ class World:
 
 myWorld = World()        
 
-def set_listener( ws, entity, data ):
+def set_listener(entity, data ):
     ''' do something with the update ! '''
     ent = {};
     ent[entity] = data
-    ws.send(JSON.dumps(ent))
+    # ws.send(json.dumps(ent))
         
 @app.route('/')
 def hello():
@@ -87,32 +103,43 @@ def hello():
 
 def read_ws(ws,client):
     '''A greenlet function that reads from the websocket and updates the world'''
-    msg = ws.receive()
-    print "WS RECV: %s" % msg
-    packet = json.loads(msg)
-    for ent in packet:
-        for key in packet[ent]:
-            myWorld.update(ent, key, packet[ent][key])
-        myWorld.update_listeners(ent)
+    try:
+        while True:
+            msg=ws.receive()
+            print "WS RECV: %s" % msg
+            if (msg is not None):
+                packet = json.loads(msg)
+                send_all_json(packet)
+
+                for ent in packet:
+                    for key in packet[ent]:
+                        myWorld.update(ent, key, packet[ent][key])
+                myWorld.update_listeners(ent)
+            else:
+                break
+    except:
+        '''Done'''
 
 @sockets.route('/subscribe')
 def subscribe_socket(ws):
     '''Fufill the websocket URL of /subscribe, every update notify the
        websocket and read updates from the websocket '''
    
-    myWorld.add_set_listener(ws)
-    ws.send(json.dumps(myWorld.world()))
+    client= Client()
+    clients.append(client)
+    g = gevent.spawn(read_ws,ws,client)
     print "Subscribing"
-    while True:
-            # block here
-        try:
-            read_ws(ws, None)
-        except Exception as e:# WebSocketError as e:
-            print "WS Error %s" % e
-            ws.close()
-            break
-    ws.send(json.dumps(myWorld.world()))
-
+    try:
+        while True:
+                # block here
+            msg = client.get()
+            ws.send(msg)
+    except Exception as e:# WebSocketError as e:
+        print "WS Error %s" % e
+    finally:
+        clients.remove(client)
+        gevent.kill(g)
+        
 def flask_post_json():
     '''Ah the joys of frameworks! They do so much work for you
        that they get in the way of sane operation!'''
